@@ -1,9 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-
 import aiomysql
-import asyncio
 import logging
 
 
@@ -32,11 +27,11 @@ async def creat_pool(loop, **kw):
     logging.info('create database connection pool...')
     global _pool
     # 接收的输入为user、password、database其他为固定变量
-    _pool = await aiomysql.create_pool(host=kw.get('host', 'localhost'),
+    _pool = await aiomysql.create_pool(host=kw.get('host', '127.0.0.1'),
                                        port=kw.get('port', 3306),
                                        user=kw['user'],
                                        password=kw['password'],
-                                       database=kw['db'],
+                                       db=kw['db'],
                                        charset=kw.get('charset', 'utf8'),
                                        autocommit=kw.get('autocommit', True),
                                        maxsize=kw.get('maxsize', 10),
@@ -111,7 +106,7 @@ class Modelmetaclass(type):
             raise RuntimeError('Primary Key not found')
         # 将定义域清空，以免类属性和实例属性在getattr时冲突
         for k in mapping.keys():
-            mapping.pop(k)
+            attrs.pop(k)
         # 创建类属性，包括映射和sql语句生成
         escaped_fields = list(map(lambda x: '`%s`' % x, fields))
         attrs['__mappings__'] = mapping
@@ -125,11 +120,7 @@ class Modelmetaclass(type):
             tableName, ', '.join(escaped_fields), primaryKey,
             create_args_string(len(escaped_fields) + 1))
         # 这里没懂为啥在里面不直接用map(lambda x: x.join(‘=？’),fields)
-        attrs['__update__'] = 'updata `%s` set %s where `%s`=?' % (tableName,
-                                                                   ', '.join(
-                                                                       map(lambda x: '%s=?' % mapping.get(x).name or x,
-                                                                           fields))
-                                                                   , primaryKey)
+        attrs['__update__'] = 'update `%s` set %s where `%s`=?' % (tableName, ', '.join(map(lambda x: '%s = ?' % (mapping.get(x).name or x), fields)), primaryKey)
         attrs['__delete__'] = 'delete from `%s` where `%s`=?' % (tableName, primaryKey)
         return type.__new__(cls, name, bases, attrs)
 
@@ -145,7 +136,10 @@ class Model(dict, metaclass=Modelmetaclass):
         self[key] = value
 
     def __getattr__(self, key):
-        return self[key]
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(r"'Model' object has no attribute '%s'" % key)
 
     def getValue(self, key):
         return getattr(self, key, None)
@@ -160,6 +154,14 @@ class Model(dict, metaclass=Modelmetaclass):
                 logging.debug('using default value for %s : %s' % (key, str(value)))
                 setattr(self, key, value)
         return value
+
+    async def save(self):
+        args = list(map(self.getValueOrDefault, self.__fields__))
+        args.append(self.getValueOrDefault(self.__primary_key__))
+        # 返回受影响的行数,语句设定一次只能插入一个记录，超过一行受影响则报错
+        rows = await execute(self.__insert__, args, )
+        if rows != 1:
+            logging.warning('failed to insert record:affected rows: %s' % rows)
 
     # 对于find方法使用@classmethod是因为此时没有实例化对象，只能对类直接调用方法所以必须使用该装饰器，使函数可以以这个类本身为参数
     # 参考https://docs.python.org/zh-cn/3.9/library/functions.html#classmethod
@@ -213,33 +215,21 @@ class Model(dict, metaclass=Modelmetaclass):
             return None
         return rs[0]['_num_']
 
-    async def save(self):
-        args = list(map(self.getValueOrDefault,self.__fields__))
-        args.append(self.getValueOrDefault(self.__primary_key__))
-        #返回受影响的行数,语句设定一次只能插入一个记录，超过一行受影响则报错
-        rows = await execute(self.__insert__,args,)
-        if rows != 1:
-            logging.warning('failed to insert record:affected rows: %s' % rows)
 
-    #程序规定只能按照主键为查找条件更新记录,且一次一条
-    async def uptate(self):
-        args = list(map(self.getValueOrDefault,self.__fields__))
+    # 程序规定只能按照主键为查找条件更新记录,且一次一条
+    async def update(self,**kwargs):
+        args = list(map(self.getValueOrDefault, self.__fields__))
         args.append(self.getValueOrDefault(self.__primary_key__))
-        rows = await execute(self.__update__,args)
-        if rows !=1:
+        rows = await execute(self.__update__, args)
+        if rows != 1:
             logging.warning('failed to update record:affected rows: %s' % rows)
 
-    #程序设定为只能以主键为搜索条件删除记录且一次只删一条
+    # 程序设定为只能以主键为搜索条件删除记录且一次只删一条
     async def remove(self):
-        args = []
-        args.append(self.getValueOrDefault(self.__primary_key__))
-        rows = await execute(self.__delete__,args)
+        args = [self.getValueOrDefault(self.__primary_key__)]
+        rows = await execute(self.__delete__, args)
         if rows != 1:
             logging.warning('failed to remove record: affected rows: %s' % rows)
-
-
-
-
 
 
 # 为定义域设置必绑属性列名，列数据类型、主键、默认值

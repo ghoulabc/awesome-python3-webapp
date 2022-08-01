@@ -14,6 +14,16 @@ def next_id():
 
 # 创建user表对应的类，类属性有id/email/passwd/admin/name/image/creat_at(记录创建时间)
 class User(Model):
+    '''def __init__(self,**kw):
+        self.id = kw.get('id',None)
+        self.email = kw.get('email',None)
+        self.passwd = kw.get('passwd',None)
+        self.admin = kw.get('admin',None)
+        self.name = kw.get('name',None)
+        self.image = kw.get('image',None)
+        self.created_at = kw.get('created_at',None)
+        super().__init__(**kw)'''
+
     __table__ = 'users'
 
     id = StringField(primary_key=True, default=next_id, ddl='varchar(50)')
@@ -36,10 +46,30 @@ class Blog(Model):
     summary = StringField(ddl='varchar(200)')
     content = TextField()
     created_at = FloatField(default=time.time)
+    '''    def __init__(self,**kw):
+            self.id = kw.get('id',None)
+            self.user_id = kw.get('user_id',None)
+            self.user_name = kw.get('user_name',None)
+            self.user_image = kw.get('user_image',None)
+            self.name = kw.get('name',None)
+            self.summary = kw.get('summary',None)
+            self.content = kw.get('content',None)
+            self.created_at = kw.get('created_at',None)
+            super().__init__(**kw)'''
 
 
 # 创建Comment表对应的类，外键为blog_id/user_id等，类属性有id/blog_id/user_id/user_name/user_image/content/created_at
 class Comment(Model):
+    '''def __init__(self,**kw):
+        self.id = kw.get('id',None)
+        self.user_id = kw.get('user_id',None)
+        self.user_name = kw.get('user_name',None)
+        self.user_image = kw.get('user_image',None)
+        self.blog_id = kw.get('blog_id',None)
+        self.content = kw.get('content',None)
+        self.created_at = kw.get('created_at',None)
+        super().__init__(**kw)'''
+
     __table__  = 'comments'
     id = StringField(primary_key=True,default=next_id,ddl='varchar(50)')
     blog_id = StringField(ddl='varchar(50)')
