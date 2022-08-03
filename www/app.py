@@ -5,6 +5,7 @@ from jinja2 import Environment,FileSystemLoader
 from aiohttp import web
 from coroweb import add_routes,add_static
 from orm import create_pool
+from config import configs
 
 #对jinja2进行设置，并加载模板
 def init_jinja2(app, **kw):
@@ -103,7 +104,8 @@ async def data_factory(app, handler):
 #创建webapp对象,添加中间件日志工厂，和响应工厂
 #响应工厂用于格式化请求
 async def init(loop):
-    await create_pool(loop,host='127.0.0.1',port=3306,user='www-data',password='www-data',db='awesome')
+    print(configs)
+    await create_pool(loop,host=configs.db.host,port=configs.db.port,user=configs.db.user,password=configs.db.password,db=configs.db.db)
     #中间件参考 https://docs.aiohttp.org/en/stable/web_advanced.html#aiohttp-web-middlewares
     #中间件在调用响应函数时被调用，它既可以在响应函数返回结果之前运行也可以之后拦截结果并加以处理并返回处理后的结果
     app = web.Application(loop=loop, middlewares=[logger_factory,response_factory])
