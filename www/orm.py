@@ -23,11 +23,11 @@ def create_args_string(num):
 
 # 异步编程的一个原则：一旦决定使用异步，则系统每一层都必须是异步，“开弓没有回头箭”，因此所有涉及io的操作均需声明为异步
 # 建立创建链接池函数，用于根据用户输入建立连接池 参照 https://aiomysql.readthedocs.io/en/latest/pool.html
-async def creat_pool(loop, **kw):
+async def create_pool(loop, **kw):
     logging.info('create database connection pool...')
-    global _pool
+    global __pool
     # 接收的输入为user、password、database其他为固定变量
-    _pool = await aiomysql.create_pool(host=kw.get('host', '127.0.0.1'),
+    __pool = await aiomysql.create_pool(host=kw.get('host', '127.0.0.1'),
                                        port=kw.get('port', 3306),
                                        user=kw['user'],
                                        password=kw['password'],
@@ -44,11 +44,10 @@ async def creat_pool(loop, **kw):
 async def select(sql, args, size=None):
     # 记录查询语句和参数
     log(sql, args)
-    global _pool
     # async with ... as ...与文件读写一样，用于保证一个协程对象执行完毕后关闭
     # 等价于a = await b \n f(a) \n a.close()
     # 与一般db-api类似，先建立连接再建立游标,只是多个异步声明
-    async with _pool.acquire() as conn:
+    async with __pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
             # 用游标执行sql语句,将sql语句替换为mysql语句
             await cur.execute(sql.replace('?', '%s'), args or ())
@@ -66,7 +65,7 @@ async def select(sql, args, size=None):
 # 接收user对象的各种方法传来的sql语句和args参数，链接到连接池，生成游标执行语句，提交。
 async def execute(sql, args):
     log(sql)
-    async with _pool.acquire() as conn:
+    async with __pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
             try:
                 await cur.execute(sql.replace('?', '%s'), args)
@@ -120,7 +119,8 @@ class Modelmetaclass(type):
             tableName, ', '.join(escaped_fields), primaryKey,
             create_args_string(len(escaped_fields) + 1))
         # 这里没懂为啥在里面不直接用map(lambda x: x.join(‘=？’),fields)
-        attrs['__update__'] = 'update `%s` set %s where `%s`=?' % (tableName, ', '.join(map(lambda x: '%s = ?' % (mapping.get(x).name or x), fields)), primaryKey)
+        attrs['__update__'] = 'update `%s` set %s where `%s`=?' % (
+        tableName, ', '.join(map(lambda x: '%s = ?' % (mapping.get(x).name or x), fields)), primaryKey)
         attrs['__delete__'] = 'delete from `%s` where `%s`=?' % (tableName, primaryKey)
         return type.__new__(cls, name, bases, attrs)
 
@@ -173,7 +173,7 @@ class Model(dict, metaclass=Modelmetaclass):
         return cls(**rs[0])
 
     @classmethod
-    async def findall(cls, where=None, args=None, **kw):
+    async def findAll(cls, where=None, args=None, **kw):
         # 根据条件查找所有符合条件的行
         # 首先判断有没有条件where
         sql = [cls.__select__]
@@ -215,9 +215,8 @@ class Model(dict, metaclass=Modelmetaclass):
             return None
         return rs[0]['_num_']
 
-
     # 程序规定只能按照主键为查找条件更新记录,且一次一条
-    async def update(self,**kwargs):
+    async def update(self, **kwargs):
         args = list(map(self.getValueOrDefault, self.__fields__))
         args.append(self.getValueOrDefault(self.__primary_key__))
         rows = await execute(self.__update__, args)
