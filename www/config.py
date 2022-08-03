@@ -3,6 +3,7 @@ import config_default
 # config.py
 configs = config_default.configs
 
+#自定义字典类型，用来给字典类型提供动态加载属性功能
 class Dict(dict):
     def __init__(self,names=(),values=(),**kw):
         super().__init__(**kw)
@@ -18,7 +19,7 @@ class Dict(dict):
     def __setattr__(self,key,value):
         self[key] = value
 
-
+# 设置合并规则，用override的数据覆写default，overrider没有的部分沿用default
 def merge(defaults,override):
     r = {}
     for k,v in defaults.items():
@@ -31,7 +32,7 @@ def merge(defaults,override):
             r[k] = v
     return r
 
-
+# 建立类型转换函数，用于把configs及其内部嵌套的字典都转换为自定义字典类型
 def toDict(d):
     D=Dict()
     for k,v in d.items():
@@ -47,5 +48,3 @@ except ImportError:
 
 
 configs = toDict(configs)
-
-print(configs)

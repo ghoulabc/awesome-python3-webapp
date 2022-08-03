@@ -8,6 +8,7 @@ from orm import create_pool
 from config import configs
 
 #对jinja2进行设置，并加载模板
+#参考 https://jinja.palletsprojects.com/en/3.1.x/templates/
 def init_jinja2(app, **kw):
     logging.info('init jinja2...')
     options = dict(
@@ -76,7 +77,7 @@ async def response_factory(app, handler):
                 resp.content_type = 'text/html;charset=utf-8'
                 return resp
         if isinstance(r,int) and r >= 100 and r < 600 :
-            return web.Response(r)
+            return web.Response(body=r)
         if isinstance(r,tuple) and len(r) == 2:
             t,m = r
             if isinstance(t,int) and t >= 100 and t < 600:
@@ -104,7 +105,6 @@ async def data_factory(app, handler):
 #创建webapp对象,添加中间件日志工厂，和响应工厂
 #响应工厂用于格式化请求
 async def init(loop):
-    print(configs)
     await create_pool(loop,host=configs.db.host,port=configs.db.port,user=configs.db.user,password=configs.db.password,db=configs.db.db)
     #中间件参考 https://docs.aiohttp.org/en/stable/web_advanced.html#aiohttp-web-middlewares
     #中间件在调用响应函数时被调用，它既可以在响应函数返回结果之前运行也可以之后拦截结果并加以处理并返回处理后的结果
