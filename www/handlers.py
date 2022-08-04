@@ -11,6 +11,7 @@ from coroweb import get, post
 from apis import APIValueError, APIResourceNotFoundError,APIError
 from models import User, Comment, Blog, next_id
 
+
 _RE_EMAIL = re.compile(r'^[a-z0-9\.\-\_]+\@[a-z0-9\-\_]+(\.[a-z0-9\-\_]+){1,4}$')
 _RE_SHA1 = re.compile(r'^[0-9a-f]{40}$')
 COOKIE_NAME = 'awesession'
@@ -18,34 +19,39 @@ _COOKIE_KEY = configs.session.secret
 
 
 def user2cookie(user,max_age):
-    #根据用户信息创建session
+    # 根据用户信息创建session
     expires = str(int(time.time() + max_age))
     s = '%s-%s-%s-%s' % (user.id,user.passwd,expires,_COOKIE_KEY)
     L = [user.id,expires,hashlib.sha1(s.encode('utf-8')).hexdigest()]
-    return '-'.join(L)
-
+    s = '-'.join(L)
+    return s
 
 async def cookie2user(cookie_str):
-    # 解析cookie为用户信息
+    # 将解析接收的request拿到cookie，判断cookie的时效性和真伪
+    # 并从中识别用户将用户返回为request的属性，使handler能够从中读取
     if not cookie_str:
         return None
     try:
+        #判断cookie是否符合格式
         L = cookie_str.split('-')
-        if len(L) != 3:
+        if len(L) !=3:
             return None
         uid,expires,sha1 = L
+        # 判断cookie是否在时效内
         if int(expires) < time.time():
             return None
-        user =await User.find(uid)
+        user = await User.find(uid)
+        # 判断cookie是否是真实的
         if user is None:
             return None
         s = '%s-%s-%s-%s' % (uid,user.passwd,expires,_COOKIE_KEY)
+        # 判断cookie是否是真实的
         if sha1 != hashlib.sha1(s.encode('utf-8')).hexdigest():
             logging.info('invalid sha1')
             return None
         user.passwd = '******'
         return user
-    except Exception  as e:
+    except Exception as e:
         logging.exception(e)
         return None
 
@@ -72,11 +78,12 @@ async def api_register_user(*,email,name,passwd):
     if not passwd or not _RE_SHA1.match(passwd):
         raise APIValueError('passwd')
     users = await User.findAll('email=?',[email])
+    #如果用户已存在，返回错误
     if len(users) > 0 :
         raise APIError('register:failed','email',message='Email is already in use.')
     uid = next_id()
     sha1_passwd = '%s:%s' % (uid, passwd)
-    user = User(id=id,name=name.strip(),email=email,
+    user = User(id=uid,name=name.strip(),email=email,
                 passwd=hashlib.sha1(sha1_passwd.encode('utf-8')).hexdigest(),
                 image='http://www.gravatar.com/avatar/%s?d=mm&s=120' % hashlib.md5(email.encode('utf-8')).hexdigest())
     await user.save()
@@ -87,4 +94,47 @@ async def api_register_user(*,email,name,passwd):
     r.content_type = 'application/json'
     r.body = json.dumps(user,ensure_ascii=False).encode('utf-8')
     return r
+
+@get('/register')
+async def register():
+    return {
+        '__template__': 'register.html'
+    }
+
+@get('/signin')
+def signin():
+    return{
+        '__template__':'signin.html'
+    }
+
+
+@post('/api/authenticate')
+async def authenticate(*,email,passwd):
+    # 检查post的参数是否完整
+    if not email:
+        raise APIValueError('email','Invalid email.')
+    if not passwd:
+        raise APIValueError('passwd','Invalid passwd.')
+    users = await User.findAll('email=?', [email])
+    # 检查用户是否存在
+    if len(users) == 0:
+        raise APIValueError('email','Email not exist.')
+    user = users[0]
+    #检查密码是否正确
+    sha1 = hashlib.sha1()
+    sha1.update(user.id.encode('utf-8'))
+    sha1.update(b':')
+    sha1.update(passwd.encode('utf-8'))
+    if user.passwd != sha1.hexdigest():
+        raise APIValueError('passwd','Invalid passwd')
+    # 确认密码和用户名匹配后，根据当前时间建立cookie
+    r = web.Response()
+    r.set_cookie(COOKIE_NAME,user2cookie(user,86400),max_age=86400,httponly=True)
+    user.passwd = '******'
+    r.content_type = 'application/json'
+    r.body = json.dumps(user,ensure_ascii=False).encode('utf-8')
+    return r
+
+
+
 
