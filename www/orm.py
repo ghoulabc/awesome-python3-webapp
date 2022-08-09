@@ -44,6 +44,7 @@ async def create_pool(loop, **kw):
 async def select(sql, args, size=None):
     # 记录查询语句和参数
     logging.info(sql, args)
+    log(sql, args)
     # async with ... as ...与文件读写一样，用于保证一个协程对象执行完毕后关闭
     # 等价于a = await b \n f(a) \n a.close()
     # 与一般db-api类似，先建立连接再建立游标,只是多个异步声明
@@ -195,7 +196,6 @@ class Model(dict, metaclass=Modelmetaclass):
                 args.append(limit)
             elif isinstance(limit, tuple) and len(limit) == 2:
                 sql.append('?,?')
-                args.extend(limit)
             else:
                 raise ValueError('Invalid limit value: %s' % str(limit))
         # join()可将列表参数返回为一个字符串

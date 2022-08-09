@@ -6,6 +6,7 @@ __author__ = 'Michael Liao'
 '''
 JSON API definition.
 '''
+
 import json, logging, inspect, functools
 
 # 创建Page对象，属性包括总条目数、单页面条目数、页面数
@@ -27,7 +28,6 @@ class Page(object):
     def __str__(self):
         return 'item_count: %s,page_count: %s, page_index: %s,page_size: %s,offset: %s,limit: %s' \
                % (self.item_count,self.page_count,self.page_index,self.page_size,self.offset,self.limit)
-
 
 
 class APIError(Exception):

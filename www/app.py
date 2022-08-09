@@ -123,6 +123,8 @@ async def auth_factory(app, handler):
             if user:
                 logging.info('set current user: %s' % user.email)
                 request.__user__ = user
+        # 如果是在管理url发来的request，验证是否为管理员
+        # 不是则重定向至一般登陆界面
         if request.path.startswith('/manage/') and (request.__user__ is None or not request.__user__.admin):
             return web.HTTPFound('/signin')
         return (await handler(request))
