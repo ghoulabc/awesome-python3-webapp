@@ -5,9 +5,9 @@
 {% block beforehead %}
 
 <script>
-
+var vm;
 function initVM(data) {
-    var vm = new Vue({
+    vm = new Vue({
         el: '#vm',
         data: {
             blogs: data.blogs,
