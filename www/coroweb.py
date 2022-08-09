@@ -158,12 +158,14 @@ def add_route(app, fn):
     if not asyncio.iscoroutinefunction(fn) and not inspect.isgeneratorfunction(fn):
         fn = asyncio.coroutine(fn)
     logging.info('add route %s %s => %s(%s)' % (method, path, fn.__name__, ', '.join(inspect.signature(fn).parameters.keys())))
+    # 将响应函数链接到相应的请求来源和方法上，web框架自动根据请求类型找到合适的响应函数
     app.router.add_route(method, path, RequestHandler(app, fn))
 
 
 # 从handlers中查找响应函数和api，加入url分发器
 def add_routes(app, module_name):
-
+    # 从handlers文件中寻找handler响应函数
+    # rfind返回字符串最后一次出现的位置上，没有则返回-1
     n = module_name.rfind('.')
     if n == (-1):
         mod = __import__(module_name, globals(), locals())
@@ -174,6 +176,7 @@ def add_routes(app, module_name):
         if attr.startswith('_'):
             continue
         fn = getattr(mod, attr)
+        # 加载所有的响应函数和api
         if callable(fn):
             method = getattr(fn, '__method__', None)
             path = getattr(fn, '__route__', None)

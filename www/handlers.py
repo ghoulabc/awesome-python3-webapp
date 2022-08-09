@@ -85,7 +85,7 @@ async def cookie2user(cookie_str):
 async def index(*, page='1'):
     page_index = get_page_index(page)
     num = await Blog.findNumber('count(id)')
-    page = Page(num)
+    page = Page(num, page_index)
     if num == 0:
         blogs = []
     else:
@@ -93,7 +93,7 @@ async def index(*, page='1'):
     return {
         '__template__': 'blogs.html',
         'page': page,
-        'blogs': blogs
+        'blogs': blogs,
     }
 
 # 注册页面，注册按钮绑定的ajax将分配到该响应函数
@@ -122,6 +122,19 @@ async def api_register_user(*,email,name,passwd):
     r.content_type = 'application/json'
     r.body = json.dumps(user,ensure_ascii=False).encode('utf-8')
     return r
+
+
+@get('/api/users')
+async def api_get_users(*, page='1'):
+    page_index = get_page_index(page)
+    num = await User.findNumber('count(id)')
+    p = Page(num, page_index)
+    if num == 0:
+        return dict(page=p, users=())
+    users = await User.findAll(orderBy='created_at desc', limit=(p.offset, p.limit))
+    for u in users:
+        u.passwd = '******'
+    return dict(page=p, users=users)
 
 
 # url为注册页面的request将被引导到该响应函数
@@ -179,19 +192,11 @@ def signout(request):
     logging.info('user signed out.')
     return r
 
-# 以文章id为url的request将被引导到该响应函数
-@get('/blog/{id}')
-async def get_blog(id):
-    # 根据文章id获取相应文章及其评论
-    blog = await Blog.find(id)
-    comments = await Comment.findAll('blog_id=?',[id],orderBy='created_at')
-    for c in comments:
-        c.html_content = text2html(c.content)
-    blog.html_content = markdown2.markdown(blog.content)
+@get('/manage/users')
+def manage_users(*, page='1'):
     return {
-        '__template__':'blog.html',
-        'blog': blog,
-        'comments':comments
+        '__template__': 'manage_users.html',
+        'page_index': get_page_index(page)
     }
 
 
@@ -243,6 +248,22 @@ async def api_get_blog(*, id):
 @get('/manage/blogs')
 def manage_blogs(*,page='1'):
     return {
-        '__template__':'manage_blogs.html',
-        'page_index':get_page_index(page)
+        '__template__': 'manage_blogs.html',
+        'page_index': get_page_index(page)
+    }
+
+
+# 以文章id为url的request将被引导到该响应函数
+@get('/blog/{id}')
+async def get_blog(id):
+    # 根据文章id获取相应文章及其评论
+    blog = await Blog.find(id)
+    comments = await Comment.findAll('blog_id=?',[id],orderBy='created_at')
+    for c in comments:
+        c.html_content = text2html(c.content)
+    blog.html_content = markdown2.markdown(blog.content)
+    return {
+        '__template__':'blog.html',
+        'blog': blog,
+        'comments':comments
     }

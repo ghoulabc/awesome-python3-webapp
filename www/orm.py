@@ -169,7 +169,7 @@ class Model(dict, metaclass=Modelmetaclass):
     async def find(cls, pk):
         # 根据主键查找行
         # 这里为什么要把pk写为列表？
-        rs = await select('%s where %s=?' % (cls.__select__, cls.__primary_key__), [pk], 1)
+        rs = await select('%s where %s=?' % (cls.__select__, cls.__primary_key__), pk, 1)
         return cls(**rs[0])
 
     @classmethod
@@ -203,7 +203,7 @@ class Model(dict, metaclass=Modelmetaclass):
         # 在使用装饰器@classmethod的函数内，使用cls（）函数，返回一个本类型的实例
         return [cls(**r) for r in rs]
 
-    # 不知道这个函数对应的是什么查询
+    # 该函数用于搜索符合条件的条目总数
     @classmethod
     async def findNumber(cls, selectField, where=None, args=None):
         sql = ['select %s _num_ from `%s`' % (selectField, cls.__table__)]
