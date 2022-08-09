@@ -7,9 +7,11 @@
 <script>
 var
     ID = '{{ id }}',
-    action = '{{ action }}';
+    action = '{{ action }}',
+    vm;
+
 function initVM(blog) {
-    var vm = new Vue({
+     vm = new Vue({
         el: '#vm',
         data: blog,
         methods: {
@@ -29,7 +31,7 @@ function initVM(blog) {
     });
     $('#vm').show();
 }
-$(function () {
+$(function (){
     if (ID) {
         getJSON('/api/blogs/' + ID, function (err, blog) {
             if (err) {

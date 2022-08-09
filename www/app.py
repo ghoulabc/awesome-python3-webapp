@@ -1,4 +1,4 @@
-import logging
+import logging;logging.basicConfig(level=logging.INFO)
 import asyncio, os, json, time
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
@@ -8,7 +8,7 @@ from orm import create_pool
 from config import configs
 from handlers import cookie2user, COOKIE_NAME
 
-logging.basicConfig(level=logging.INFO)
+
 # 对jinja2进行设置，并加载模板
 # 参考 https://jinja.palletsprojects.com/en/3.1.x/templates/
 def init_jinja2(app, **kw):
