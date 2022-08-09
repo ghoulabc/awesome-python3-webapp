@@ -43,7 +43,7 @@ async def create_pool(loop, **kw):
 # 接收user对象的各种方法传来的sql语句和args参数，链接到连接池，生成游标执行语句，提交。
 async def select(sql, args, size=None):
     # 记录查询语句和参数
-    log(sql, args)
+    logging.info(sql, args)
     # async with ... as ...与文件读写一样，用于保证一个协程对象执行完毕后关闭
     # 等价于a = await b \n f(a) \n a.close()
     # 与一般db-api类似，先建立连接再建立游标,只是多个异步声明
@@ -195,7 +195,7 @@ class Model(dict, metaclass=Modelmetaclass):
                 args.append(limit)
             elif isinstance(limit, tuple) and len(limit) == 2:
                 sql.append('?,?')
-                args.append(limit)
+                args.extend(limit)
             else:
                 raise ValueError('Invalid limit value: %s' % str(limit))
         # join()可将列表参数返回为一个字符串

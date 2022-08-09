@@ -58,7 +58,7 @@ async def logger_factory(app, handler):
 
 async def response_factory(app, handler):
     async def response(request):
-        # 在响应函数返回视图后进行格式化和渲染
+        # 在响应函数返回视图后根据响应的数据类型进行格式化和渲染
         r = await handler(request)
         if isinstance(r, web.StreamResponse):
             return r
@@ -77,8 +77,9 @@ async def response_factory(app, handler):
                     body=json.dumps(r, ensure_ascii=False, default=lambda x: x.__dict__).encode('utf-8'))
                 resp.content_type = 'application/json;charset=utf-8'
                 return resp
-            # 将handler返回的参数写入jinja2加载的模板并相应
+            # 将handler返回的参数写入jinja2加载的模板并响应，所有response的user信息都是在这里加载的
             else:
+                r['__user__'] = request.__user__
                 resp = web.Response(body=app['__templating__'].get_template(template).render(**r).encode('utf-8'))
                 resp.content_type = 'text/html;charset=utf-8'
                 return resp
@@ -110,25 +111,22 @@ async def data_factory(app, handler):
 
     return parse_data
 
-
+# 从request中解析cookie获取用户信息，提交给后续handler
+# 若无用户信息则跳转登录界面
 async def auth_factory(app, handler):
     async def auth(request):
-        logging.info('check user:%s %s' % (request.method, request.path))
+        logging.info('check user: %s %s' % (request.method, request.path))
         request.__user__ = None
-        cookie_str = request.cookie.get(COOKIE_NAME)
-        # 从request中寻找cookie
+        cookie_str = request.cookies.get(COOKIE_NAME)
         if cookie_str:
             user = await cookie2user(cookie_str)
-            # 从cookie中解析user信息
             if user:
                 logging.info('set current user: %s' % user.email)
                 request.__user__ = user
-            # 如果是在管理url发来的request，验证是否为管理员
-            # 不是则重定向至一般登陆界面
-            if request.path.startwith('/manage/') and (request.__user__ is None or not request.__user__.admin):
-                return web.HTTPFound('/signin')
-            return (await handler(request))
-        return auth
+        if request.path.startswith('/manage/') and (request.__user__ is None or not request.__user__.admin):
+            return web.HTTPFound('/signin')
+        return (await handler(request))
+    return auth
 
 
 # 创建webapp对象,添加中间件日志工厂，和响应工厂
@@ -138,7 +136,7 @@ async def init(loop):
                       password=configs.db.password, db=configs.db.db)
     # 中间件参考 https://docs.aiohttp.org/en/stable/web_advanced.html#aiohttp-web-middlewares
     # 中间件在调用响应函数时被调用，它既可以在响应函数返回结果之前运行也可以之后拦截结果并加以处理并返回处理后的结果
-    app = web.Application(loop=loop, middlewares=[logger_factory, response_factory])
+    app = web.Application(loop=loop, middlewares=[logger_factory, response_factory, data_factory, auth_factory])
     init_jinja2(app, filters=dict(datetime=datetime_filter))
     # 监听分发url
     add_routes(app, 'handlers')

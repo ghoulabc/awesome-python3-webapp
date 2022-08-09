@@ -8,7 +8,7 @@ from aiohttp import web
 import re, time, json, logging, hashlib, base64, asyncio
 from config import configs
 from coroweb import get, post
-from apis import APIValueError, APIResourceNotFoundError,APIError,APIPermissionError
+from apis import APIValueError, APIResourceNotFoundError,APIError,APIPermissionError,Page
 from models import User, Comment, Blog, next_id
 import markdown2
 
@@ -17,6 +17,16 @@ _RE_SHA1 = re.compile(r'^[0-9a-f]{40}$')
 COOKIE_NAME = 'awesession'
 _COOKIE_KEY = configs.session.secret
 
+# 处理request附带的page参数，解析为整数
+def get_page_index(page_str):
+    p = 1
+    try:
+        p = int(page_str)
+    except ValueError as e:
+        pass
+    if p < 1:
+        p = 1
+    return p
 
 # 将sql搜索到的文章本文转化为html格式的段落文本
 def text2html(text):
@@ -72,15 +82,17 @@ async def cookie2user(cookie_str):
 
 # url为主页的request将被分配到该响应函数
 @get('/')
-def index(request):
-    summary = 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.'
-    blogs = [
-        Blog(id='1', name='Test Blog', summary=summary, created_at=time.time()-120),
-        Blog(id='2', name='Something New', summary=summary, created_at=time.time()-3600),
-        Blog(id='3', name='Learn Swift', summary=summary, created_at=time.time()-7200)
-    ]
+async def index(*, page='1'):
+    page_index = get_page_index(page)
+    num = await Blog.findNumber('count(id)')
+    page = Page(num)
+    if num == 0:
+        blogs = []
+    else:
+        blogs = await Blog.findAll(orderBy='created_at desc', limit=(page.offset, page.limit))
     return {
         '__template__': 'blogs.html',
+        'page': page,
         'blogs': blogs
     }
 
@@ -208,4 +220,29 @@ async def api_create_blog(request, *, name, summary, content):
     return blog
 
 
+# 翻页按钮ajax触发的request被引导到该响应函数
+# 从根据页数计算已翻过数量，从数据库中查找下一页条目
+@get('/api/blogs')
+async def api_blogs(*,page='1'):
+    page_index = get_page_index(page)
+    # 查找文章总数
+    num = await Blog.findNumber('count(id)')
+    p = Page(num,page_index)
+    if num == 0:
+        return dict(page=p,blogs=())
+    blogs = await Blog.findAll(orderBy='created_at desc', limit=(p.offset,p.limit))
+    return dict(page=p,blogs=blogs)
 
+
+@get('/api/blogs/{id}')
+async def api_get_blog(*, id):
+    blog = await Blog.find(id)
+    return blog
+
+# 从管理文章页面url发来的request由该响应函数处理
+@get('/manage/blogs')
+def manage_blogs(*,page='1'):
+    return {
+        '__template__':'manage_blogs.html',
+        'page_index':get_page_index(page)
+    }
