@@ -1,3 +1,7 @@
+#!/usr/bin/python3
+
+import sys
+sys.path.append(r'C:\Users\ghoul\awesome-python3-webapp\awesome-python3-webapp\www\app.py')
 import logging;logging.basicConfig(level=logging.INFO)
 import asyncio, os, json, time
 from datetime import datetime
@@ -108,8 +112,8 @@ async def data_factory(app, handler):
                 request.__data__ = await request.post()
                 logging.info('request form: %s' % str(request.__data__))
         return (await handler(request))
-
     return parse_data
+
 
 # 从request中解析cookie获取用户信息，提交给后续handler
 # 若无用户信息则跳转登录界面

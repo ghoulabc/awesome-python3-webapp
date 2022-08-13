@@ -31,7 +31,12 @@ $(function() {
                     };
                 $form.postJSON('/api/authenticate', data, function(err, result) {
                     if (! err) {
+                        if (result.admin===1){
+                            location.assign('/manage/blogs')
+                        }
+                        else {
                         location.assign('/');
+                        }
                     }
                 });
             }
